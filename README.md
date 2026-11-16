@@ -1,6 +1,6 @@
 # Ziko Boutique — API du test technique
 
-Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. Le serveur, le schéma SQL, Swagger et les routes produits et commandes sont disponibles. Le paiement et la petite page web demandés dans le sujet seront développés ensuite.
+Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. Le serveur, le schéma SQL, Swagger et les routes produits, commandes et paiement par référence sont disponibles. La petite page web demandée dans le sujet sera développée ensuite.
 
 ## État actuel
 
@@ -11,7 +11,7 @@ Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. 
 | Schéma PostgreSQL et migrations SQL | Disponible |
 | Création et liste des produits | Disponible : `POST /api/products`, `GET /api/products` |
 | Création et consultation des commandes | Disponible : `POST /api/orders`, `GET /api/orders/:id` |
-| Paiement et prévention du double paiement | À développer |
+| Paiement et prévention du double paiement | Disponible : `POST /api/orders/:id/payments` |
 | Petite page web | À développer |
 
 ## Prérequis
@@ -111,6 +111,12 @@ Créer une commande avec `POST /api/orders` et `{"productId":"<uuid-du-produit>"
 
 Une entrée invalide renvoie `400 INVALID_ORDER`, un identifiant de commande mal formé `400 INVALID_ORDER_ID`, un produit absent `404 PRODUCT_NOT_FOUND`, une commande absente `404 ORDER_NOT_FOUND` et un stock insuffisant `409 INSUFFICIENT_STOCK`.
 
+## API paiements
+
+`POST /api/orders/:id/payments` reçoit `{"paymentReference":"reference-operateur"}`. Le premier appel valide met la commande à `PAID` et diminue le stock dans une transaction PostgreSQL. La réponse contient `orderId`, `status`, `paymentReference` et `alreadyProcessed: false`. Répéter le même appel renvoie `200` avec `alreadyProcessed: true`, sans seconde diminution du stock. Une autre référence pour une commande payée renvoie `409 ORDER_ALREADY_PAID`. Une référence déjà utilisée pour une autre commande renvoie `409 PAYMENT_REFERENCE_CONFLICT`. Si le stock est devenu insuffisant, `409 INSUFFICIENT_STOCK` laisse la commande en attente et n'enregistre aucun paiement.
+
+Ce parcours reçoit une référence supposée fournie par un opérateur ; **il ne contacte pas encore un agrégateur et ne débite aucun compte réel**. Avant une intégration sandbox, il faudra vérifier l'API marchande, authentifier la confirmation du fournisseur et ne finaliser la commande qu'après confirmation effective. La transaction locale et les contraintes uniques protègent le stock et l'état de la commande contre les appels répétés ou simultanés.
+
 ## Architecture et choix techniques
 
 Le serveur est un **monolithe modulaire** : une application Express et une base PostgreSQL, avec un dossier par domaine (`products`, `orders`, `payments`). Ce découpage garde les règles proches de leur domaine sans ajouter la complexité de plusieurs services. Le parcours prévu d'une requête est `route → validation → controller → service → repository → SQL`.
@@ -161,9 +167,9 @@ Dans chaque module, `index.ts` expose sa route, `*.controller.ts` gère HTTP, `*
 
 ## Tests prévus
 
-Les tests unitaires vérifient la validation, le calcul des pages et les erreurs métier des commandes. Les tests HTTP avec PostgreSQL vérifient la création des produits et commandes, le stock insuffisant, le prix figé et la consultation. Le paiement répété, les références en conflit et deux appels simultanés seront testés avec le module paiements.
+Les tests unitaires vérifient les validations, le calcul des pages et les erreurs métier des commandes. Les tests HTTP avec PostgreSQL vérifient les produits, commandes et paiements, notamment les références répétées, les conflits et les appels concurrents.
 
-Pour exécuter les tests produits et commandes sur une vraie base sous PowerShell :
+Pour exécuter tous les tests sur une vraie base sous PowerShell :
 
 ```powershell
 Copy-Item .env.example .env
