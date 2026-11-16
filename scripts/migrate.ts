@@ -1,11 +1,9 @@
-import 'dotenv/config';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Pool } from 'pg';
-import { z } from 'zod';
+import { dbConfig } from '../src/config/db.config.js';
 
-const databaseUrl = z.string().min(1).parse(process.env.DATABASE_URL);
-const pool = new Pool({ connectionString: databaseUrl });
+const pool = new Pool(dbConfig);
 
 async function main(): Promise<void> {
   const directory = resolve('src/database/migrations');

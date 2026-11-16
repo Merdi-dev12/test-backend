@@ -34,30 +34,34 @@ L'adresse réelle du dépôt sera ajoutée une fois le dépôt publié ; aucune 
 
 ## Lancer en local
 
-1. Créer une base PostgreSQL et un utilisateur autorisé à créer des tables. Par exemple, dans `psql` avec un compte administrateur :
+1. Ouvrir **pgAdmin 4**, se connecter au serveur PostgreSQL local avec le compte administrateur créé à l'installation, sélectionner la base de maintenance `postgres`, puis ouvrir **Tools → Query Tool**. Y exécuter les deux commandes suivantes séparément, en remplaçant le mot de passe par une valeur choisie pour ton poste :
 
    ```sql
-   CREATE USER ziko WITH PASSWORD 'ziko';
+   CREATE USER ziko WITH PASSWORD 'mot-de-passe-local';
    CREATE DATABASE ziko OWNER ziko;
    ```
 
-2. Installer les dépendances et créer la configuration :
+   Dans `psql`, la même opération se fait après `psql -U postgres -d postgres` (saisir le mot de passe administrateur quand il est demandé). `CREATE DATABASE` doit s'exécuter hors d'une transaction explicite. Si le rôle ou la base existent déjà, réutiliser ceux-ci et passer à l'étape suivante.
+
+2. Dans le terminal, à la racine du projet, installer les dépendances et créer la configuration :
 
    ```bash
    npm ci
    cp .env.example .env
    ```
 
-   Sous PowerShell, remplacer `cp` par `Copy-Item .env.example .env` si nécessaire. Adapter `DATABASE_URL` dans `.env` au serveur PostgreSQL local. Le mot de passe de l'exemple est uniquement destiné au développement local.
+   Sous PowerShell, `Copy-Item .env.example .env` fonctionne aussi. Ouvrir `.env`, remplacer `DB_PASSWORD=change-me-local` par le mot de passe choisi à l'étape 1, et vérifier `DB_HOST`, `DB_PORT`, `DB_NAME` et `DB_USER`. L'application lit ce fichier automatiquement ; pgAdmin sert à administrer PostgreSQL, il ne transmet pas ses identifiants à l'application. Le rôle et son mot de passe sont gérés par PostgreSQL ; la copie nécessaire à l'application est dans `.env`, ignoré par Git.
 
-3. Appliquer les migrations puis démarrer l'API :
+3. Toujours dans le terminal, appliquer les migrations puis démarrer l'API :
 
    ```bash
    npm run db:migrate
    npm run dev
    ```
 
-4. Ouvrir `http://localhost:3000/health` pour vérifier le serveur, puis `http://localhost:3000/api-docs` pour Swagger. Le port se règle avec `PORT` dans `.env`.
+4. Ouvrir `http://localhost:3000/health` pour vérifier le serveur, puis `http://localhost:3000/api-docs` pour Swagger. Le port se règle avec `PORT` dans `.env`. Dans pgAdmin, rafraîchir la base `ziko` pour voir les tables après la migration.
+
+`npm run dev` utilise `tsx watch` : il redémarre automatiquement le serveur quand un fichier TypeScript change. Nodemon n'est donc pas requis. `npm start` exécute la version compilée sans rechargement.
 
 Pour exécuter la version compilée :
 
@@ -68,19 +72,19 @@ npm start
 
 ## Lancer avec Docker
 
-Depuis la racine du projet :
+Depuis la racine du projet, créer `.env` avec `cp .env.example .env` (ou `Copy-Item .env.example .env` sous PowerShell), puis choisir un `DB_PASSWORD` local. Lancer ensuite :
 
 ```bash
 docker compose up --build
 ```
 
-Compose démarre PostgreSQL, applique les migrations, puis lance l'API. Consulter `/health` et `/api-docs` sur le port `3000` de la machine. Pour arrêter :
+Compose crée le rôle et la base indiqués dans `.env` lors du **premier** démarrage de son volume PostgreSQL, applique les migrations, puis lance l'API. Aucune commande SQL manuelle n'est nécessaire pour cette option. Consulter `/health` et `/api-docs` sur le port `3000` de la machine. Pour arrêter :
 
 ```bash
 docker compose down
 ```
 
-Les données PostgreSQL sont conservées dans un volume. `docker compose down -v` supprime ce volume et donc les données locales. En cas de conflit de port, définir `PORT` ou `DB_PORT` dans un fichier `.env` à la racine avant de lancer Compose. `PORT` change le port HTTP exposé ; `DB_PORT` change le port PostgreSQL exposé.
+Les données PostgreSQL sont conservées dans un volume. Changer `DB_USER`, `DB_PASSWORD` ou `DB_NAME` dans `.env` après la création de ce volume ne recrée pas le rôle ni la base : il faut les modifier dans PostgreSQL ou recréer volontairement le volume. `docker compose down -v` supprime ce volume et donc les données locales. En cas de conflit de port, définir `PORT` ou `DB_PORT` dans `.env`. `PORT` change le port HTTP exposé ; `DB_PORT` change le port PostgreSQL exposé sur la machine. Pour voir la base Docker dans pgAdmin, enregistrer un serveur avec l'hôte `localhost`, le port `DB_PORT`, le rôle `DB_USER` et le mot de passe `DB_PASSWORD`.
 
 ## Commandes utiles
 
@@ -101,9 +105,15 @@ Le serveur est un **monolithe modulaire** : une application Express et une base 
 
 Le SQL est écrit explicitement avec `pg` et des paramètres. Il rend les transactions et les contraintes visibles pour le point central du sujet : empêcher le double paiement. Une migration crée les tables. Le script de migration enregistre les fichiers déjà appliqués dans `schema_migrations` et les exécute par ordre de nom. Il ne faut pas modifier un fichier déjà appliqué : ajouter une nouvelle migration.
 
+`src/config/env.ts` valide les variables au démarrage ; `src/config/db.config.ts` transforme ces valeurs en configuration PostgreSQL ; `src/database/pool.ts` crée le pool de connexions. Les secrets sont dans `.env` sur le poste, jamais dans les fichiers SQL ni dans Git.
+
 La commande garde le prix unitaire au moment de sa création. Elle démarre en `PENDING`. La création vérifie le stock mais ne le réserve pas, car le sujet demande de le diminuer au paiement. Au paiement, une transaction devra verrouiller la commande, revérifier le stock et appliquer le paiement et la décrémentation une seule fois. Les contraintes uniques sur `payments.order_id` et `payments.payment_reference` serviront de protection en base. Ce flux n'est pas encore implémenté.
 
 Redis n'est pas nécessaire à cette initialisation : PostgreSQL peut assurer l'atomicité et l'idempotence attendues. `seeders/` est réservé aux données facultatives de démonstration ; aucune donnée de base n'est requise pour démarrer.
+
+### Agrégateur de paiement envisagé
+
+**Shwary en sandbox est à l'étude**, à la demande du projet. Un [SDK Node.js publié séparément](https://www.npmjs.com/package/@shwary/node-sdk) décrit des paiements CDF en RDC et un mode sandbox. Cependant, le [site public de Shwary](https://shwary.com/) présente actuellement un service de transferts entre particuliers. L'existence et les garanties d'une API de collecte marchande doivent donc être confirmées dans une documentation fournisseur et avec un compte sandbox avant toute intégration. Le sujet exige d'abord la réception d'une référence de paiement : le parcours API demandé restera démontrable sans compte marchand.
 
 ## Arborescence
 
@@ -115,7 +125,9 @@ Redis n'est pas nécessaire à cette initialisation : PostgreSQL peut assurer l'
 │   ├── app.ts                    Montage Express et routes communes
 │   ├── server.ts                 Démarrage et arrêt du serveur
 │   ├── openapi.ts                Contrat Swagger actuellement disponible
-│   ├── config/env.ts             Validation des variables d'environnement
+│   ├── config/
+│   │   ├── env.ts                Validation des variables d'environnement
+│   │   └── db.config.ts          Configuration PostgreSQL
 │   ├── database/
 │   │   ├── pool.ts               Pool PostgreSQL
 │   │   ├── migrations/           Évolutions SQL du schéma

@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ziko
-      POSTGRES_PASSWORD: ziko
-      POSTGRES_DB: ziko
+      POSTGRES_USER: ${DB_USER:?Set DB_USER in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME in .env}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ziko -d ziko"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,7 +20,11 @@ services:
       target: build
     working_dir: /app
     environment:
-      DATABASE_URL: postgresql://ziko:ziko@db:5432/ziko
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:?Set DB_NAME in .env}
+      DB_USER: ${DB_USER:?Set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     command: npm run db:migrate
     depends_on:
       db:
@@ -29,7 +33,11 @@ services:
     build: .
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://ziko:ziko@db:5432/ziko
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:?Set DB_NAME in .env}
+      DB_USER: ${DB_USER:?Set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
       - "${PORT:-3000}:3000"
     depends_on:
