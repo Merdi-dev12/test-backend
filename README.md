@@ -1,6 +1,6 @@
 # Ziko Boutique — API du test technique
 
-Backend d'une petite boutique de Kinshasa. Le projet utilisera TypeScript, Express et PostgreSQL pour gérer les produits, les commandes et leur paiement. Cette version est **l'initialisation du projet** : serveur, connexion à la base, schéma SQL, Swagger et structure modulaire. Les routes métier et la petite page web demandées dans le sujet seront développées ensuite.
+Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. Le serveur, le schéma SQL, Swagger et les routes produits sont disponibles. Les commandes, le paiement et la petite page web demandés dans le sujet seront développés ensuite.
 
 ## État actuel
 
@@ -9,7 +9,7 @@ Backend d'une petite boutique de Kinshasa. Le projet utilisera TypeScript, Expre
 | `GET /health` | Disponible ; vérifie PostgreSQL |
 | Swagger UI `/api-docs` | Disponible ; documente actuellement `/health` |
 | Schéma PostgreSQL et migrations SQL | Disponible |
-| Création et liste des produits | À développer |
+| Création et liste des produits | Disponible : `POST /api/products`, `GET /api/products` |
 | Création et consultation des commandes | À développer |
 | Paiement et prévention du double paiement | À développer |
 | Petite page web | À développer |
@@ -99,6 +99,12 @@ Les données PostgreSQL sont conservées dans un volume. Changer `DB_USER`, `DB_
 | `npm run test:unit` | Lancer les tests unitaires |
 | `npm run test:integration` | Lancer les tests d'intégration |
 
+## API produits
+
+Créer un produit avec `POST /api/products` et un corps JSON comme `{"name":"Savon","priceCdf":5000,"stock":10}`. Ce sont les trois attributs demandés par le sujet : nom, prix entier en francs congolais et stock disponible. L'API ajoute `id` et `createdAt` à la réponse. Le nom ne peut pas être vide ; le prix et le stock sont des entiers non négatifs. Une entrée invalide renvoie `400` avec le code `INVALID_PRODUCT`.
+
+`GET /api/products?page=1&limit=20` renvoie `{ "items": [...], "page": 1, "limit": 20, "total": 0, "totalPages": 0 }` pour un catalogue vide. La page commence à 1 ; `limit` vaut 20 par défaut et ne peut pas dépasser 100. L'ordre est `createdAt` décroissant, puis `id` décroissant pour départager les produits créés au même instant. Une pagination invalide renvoie `400` avec le code `INVALID_PAGINATION`. Les exemples interactifs sont dans Swagger.
+
 ## Architecture et choix techniques
 
 Le serveur est un **monolithe modulaire** : une application Express et une base PostgreSQL, avec un dossier par domaine (`products`, `orders`, `payments`). Ce découpage garde les règles proches de leur domaine sans ajouter la complexité de plusieurs services. Le parcours prévu d'une requête est `route → validation → controller → service → repository → SQL`.
@@ -149,7 +155,19 @@ Dans chaque module, `index.ts` expose sa route, `*.controller.ts` gère HTTP, `*
 
 ## Tests prévus
 
-Les tests unitaires couvriront les validations et règles indépendantes de PostgreSQL. Les tests d'intégration utiliseront une vraie base pour vérifier les routes, les erreurs, le stock insuffisant, le paiement répété, les références en conflit et deux appels simultanés. Les dossiers sont créés ; aucun test métier n'est encore présent.
+Les tests unitaires vérifient la validation et le calcul des pages. Un test HTTP vérifie les paramètres et la réponse sans base de données. Les futurs tests d'intégration couvriront aussi le stock insuffisant, le paiement répété, les références en conflit et deux appels simultanés.
+
+Pour exécuter les tests produit sur une vraie base sous PowerShell :
+
+```powershell
+Copy-Item .env.example .env
+# Ouvrir .env et remplacer DB_PASSWORD par le mot de passe de la base.
+docker compose up --build -d
+$env:RUN_DB_TESTS='true'
+npm test
+```
+
+Si PostgreSQL est lancé localement sans Docker, appliquer d'abord `npm run db:migrate`, puis lancer les deux dernières commandes. Sans `RUN_DB_TESTS=true`, les tests nécessitant PostgreSQL sont ignorés. Sans `.env` ou variables `DB_*`, leur exécution échoue volontairement avec une explication.
 
 ## Avec plus de temps
 
