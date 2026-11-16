@@ -140,7 +140,15 @@ export const openApiDocument = {
         summary: 'Consulter et réconcilier le dernier paiement de la commande',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         responses: {
-          '200': { description: 'Statut de la tentative après interrogation de pawaPay' },
+          '200': { description: 'Statut de la tentative après interrogation de pawaPay',
+            content: { 'application/json': { schema: { type: 'object',
+              required: ['orderId', 'depositId', 'status'],
+              properties: {
+                orderId: { type: 'string', format: 'uuid' },
+                depositId: { type: 'string', format: 'uuid' },
+                status: { type: 'string', enum: ['INITIATING', 'PENDING', 'UNKNOWN', 'FAILED', 'COMPLETED'] },
+              },
+            } } } },
           '404': { description: 'Commande ou tentative introuvable' },
         },
       },

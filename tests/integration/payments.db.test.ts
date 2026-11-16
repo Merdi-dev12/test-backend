@@ -7,6 +7,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('paiements pawaPay et Postg
   let pool: typeof import('../../src/database/pool.js').pool;
   let initiatePayment: typeof import('../../src/modules/payments/payments.service.js').initiatePayment;
   let refreshPayment: typeof import('../../src/modules/payments/payments.service.js').refreshPayment;
+  let getOrderPayment: typeof import('../../src/modules/payments/payments.service.js').getOrderPayment;
   const products: string[] = [];
   const orders: string[] = [];
   const input = { provider: 'VODACOM_MPESA_COD' as const, phoneNumber: '243813456789' };
@@ -19,6 +20,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('paiements pawaPay et Postg
     pool = db.pool;
     initiatePayment = service.initiatePayment;
     refreshPayment = service.refreshPayment;
+    getOrderPayment = service.getOrderPayment;
     await pool.query('SELECT 1 FROM payment_attempts LIMIT 1');
   });
 
@@ -80,6 +82,11 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('paiements pawaPay et Postg
     expect(await state(orderId, productId)).toEqual({ stock: 1, reserved_stock: 0,
       order: 'PAID', payments: 1, attempts: ['COMPLETED'] });
     expect((await refreshPayment(responses[0].depositId, provider)).status).toBe('COMPLETED');
+    expect(await getOrderPayment(orderId, provider)).toEqual({
+      orderId, depositId: responses[0].depositId, status: 'COMPLETED',
+    });
+    await expect(initiatePayment(orderId, input, provider)).rejects.toMatchObject({ code: 'ORDER_ALREADY_PAID' });
+    expect(provider.initiate).toHaveBeenCalledTimes(1);
   });
 
   it('libère le stock après un échec confirmé et permet une nouvelle tentative', async () => {

@@ -8,6 +8,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('products HTTP + PostgreSQL
   let baseUrl: string;
   let pool: typeof import('../../src/database/pool.js').pool;
   const createdIds: string[] = [];
+  const adminHeaders = process.env.ADMIN_API_KEY ? { 'x-admin-key': process.env.ADMIN_API_KEY } : {};
 
   beforeAll(async () => {
     const required = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'] as const;
@@ -34,7 +35,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('products HTTP + PostgreSQL
 
   async function createTestProduct(name: string) {
     const response = await fetch(`${baseUrl}/api/products`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', ...adminHeaders },
       body: JSON.stringify({ name, priceCdf: 5000, stock: 10 }),
     });
     expect(response.status).toBe(201);
@@ -75,13 +76,22 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('products HTTP + PostgreSQL
 
   it('refuse une entrée invalide avec une erreur claire', async () => {
     const response = await fetch(`${baseUrl}/api/products`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', ...adminHeaders },
       body: JSON.stringify({ name: '', priceCdf: -1, stock: 1 }),
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual(expect.objectContaining({
       error: expect.objectContaining({ code: 'INVALID_PRODUCT' }),
     }));
+  });
+
+  it.skipIf(!process.env.ADMIN_API_KEY)('refuse la création sans clé administrateur', async () => {
+    const response = await fetch(`${baseUrl}/api/products`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Sans clé', priceCdf: 5000, stock: 1 }),
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: 'UNAUTHORIZED' } });
   });
 
   it('refuse une pagination invalide', async () => {
