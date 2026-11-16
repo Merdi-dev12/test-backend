@@ -3,7 +3,7 @@ export const openApiDocument = {
   info: {
     title: 'Ziko Boutique API',
     version: '0.1.0',
-    description: 'API de la boutique Ziko. Produits et commandes disponibles ; paiement à venir.',
+    description: 'API de la boutique Ziko. Produits, commandes et paiement par référence.',
   },
   components: {
     schemas: {
@@ -106,6 +106,29 @@ export const openApiDocument = {
           '200': { description: 'Commande trouvée', content: { 'application/json': { schema: { $ref: '#/components/schemas/Order' } } } },
           '400': { description: 'Identifiant invalide' },
           '404': { description: 'Commande introuvable' },
+        },
+      },
+    },
+    '/api/orders/{id}/payments': {
+      post: {
+        summary: 'Payer une commande avec une référence de paiement',
+        description: 'Le même appel répété retourne alreadyProcessed=true sans nouveau débit de stock. Une commande déjà payée avec une autre référence retourne 409.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['paymentReference'], additionalProperties: false,
+          properties: { paymentReference: { type: 'string', minLength: 1, maxLength: 200 } },
+        } } } },
+        responses: {
+          '200': { description: 'Paiement traité ou répétition idempotente', content: { 'application/json': { schema: {
+            type: 'object', required: ['orderId', 'status', 'paymentReference', 'alreadyProcessed'],
+            properties: {
+              orderId: { type: 'string', format: 'uuid' }, status: { type: 'string', enum: ['PAID'] },
+              paymentReference: { type: 'string' }, alreadyProcessed: { type: 'boolean' },
+            },
+          } } } },
+          '400': { description: 'Identifiant ou référence invalide' },
+          '404': { description: 'Commande introuvable' },
+          '409': { description: 'Commande déjà payée, référence déjà utilisée ou stock insuffisant' },
         },
       },
     },
