@@ -40,7 +40,7 @@ const orderColumns = 'id, product_id, quantity, unit_price_cdf, status, created_
 export async function insertOrder(id: string, input: CreateOrderInput): Promise<Order | null> {
   const result = await pool.query<OrderRow>(
     `INSERT INTO orders (id, product_id, quantity, unit_price_cdf)
-     SELECT $1, id, $3, price_cdf FROM products WHERE id = $2 AND stock >= $3
+     SELECT $1, id, $3, price_cdf FROM products WHERE id = $2 AND stock - reserved_stock >= $3
      RETURNING ${orderColumns}`,
     [id, input.productId, input.quantity],
   );

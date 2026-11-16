@@ -11,23 +11,31 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "payments:reconcile": "tsx scripts/reconcile-payments.ts --once",
+    "payments:worker": "tsx scripts/reconcile-payments.ts"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.7.4",
+    "helmet": "^8.3.0",
     "pg": "^8.16.3",
     "swagger-ui-express": "^5.0.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.6.2",
     "@types/pg": "^8.15.5",
     "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^5.1.0"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22.12"
+  }
 }

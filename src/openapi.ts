@@ -3,7 +3,7 @@ export const openApiDocument = {
   info: {
     title: 'Ziko Boutique API',
     version: '0.1.0',
-    description: 'API de la boutique Ziko. Produits, commandes et paiement par référence.',
+    description: 'API de la boutique Ziko. Produits, commandes et dépôts pawaPay sandbox.',
   },
   components: {
     schemas: {
@@ -44,6 +44,8 @@ export const openApiDocument = {
     '/api/products': {
       post: {
         summary: 'Créer un produit',
+        parameters: [{ name: 'x-admin-key', in: 'header', required: false,
+          description: 'Requis si ADMIN_API_KEY est configurée, toujours requis en production.', schema: { type: 'string' } }],
         requestBody: {
           required: true,
           content: { 'application/json': { schema: {
@@ -82,7 +84,7 @@ export const openApiDocument = {
     '/api/orders': {
       post: {
         summary: 'Créer une commande pour un produit',
-        description: 'Vérifie le stock sans le réserver. La commande démarre en attente.',
+        description: 'Vérifie le stock disponible. La commande démarre en attente ; le stock est réservé à l’initiation du paiement.',
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object', required: ['productId', 'quantity'], additionalProperties: false,
           properties: {
@@ -111,25 +113,46 @@ export const openApiDocument = {
     },
     '/api/orders/{id}/payments': {
       post: {
-        summary: 'Payer une commande avec une référence de paiement',
-        description: 'Le même appel répété retourne alreadyProcessed=true sans nouveau débit de stock. Une commande déjà payée avec une autre référence retourne 409.',
+        summary: 'Initier un dépôt pawaPay sandbox pour une commande',
+        description: 'Réserve le stock et crée une tentative stable. Une initiation acceptée ne marque pas la commande payée.',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
         requestBody: { required: true, content: { 'application/json': { schema: {
-          type: 'object', required: ['paymentReference'], additionalProperties: false,
-          properties: { paymentReference: { type: 'string', minLength: 1, maxLength: 200 } },
+          type: 'object', required: ['provider', 'phoneNumber'], additionalProperties: false,
+          properties: { provider: { type: 'string', enum: ['VODACOM_MPESA_COD', 'AIRTEL_COD', 'ORANGE_COD'] },
+            phoneNumber: { type: 'string', pattern: '^243[0-9]{9}$' } },
         } } } },
         responses: {
-          '200': { description: 'Paiement traité ou répétition idempotente', content: { 'application/json': { schema: {
-            type: 'object', required: ['orderId', 'status', 'paymentReference', 'alreadyProcessed'],
+          '202': { description: 'Tentative créée ou déjà en cours', content: { 'application/json': { schema: {
+            type: 'object', required: ['orderId', 'depositId', 'status', 'alreadyProcessed'],
             properties: {
-              orderId: { type: 'string', format: 'uuid' }, status: { type: 'string', enum: ['PAID'] },
-              paymentReference: { type: 'string' }, alreadyProcessed: { type: 'boolean' },
+              orderId: { type: 'string', format: 'uuid' }, depositId: { type: 'string', format: 'uuid' },
+              status: { type: 'string', enum: ['INITIATING', 'PENDING', 'UNKNOWN', 'FAILED', 'COMPLETED'] },
+              alreadyProcessed: { type: 'boolean' },
             },
           } } } },
-          '400': { description: 'Identifiant ou référence invalide' },
+          '400': { description: 'Entrée invalide' },
           '404': { description: 'Commande introuvable' },
-          '409': { description: 'Commande déjà payée, référence déjà utilisée ou stock insuffisant' },
+          '409': { description: 'Commande payée, paiement en cours ou stock insuffisant' },
+          '503': { description: 'Sandbox non configurée' },
         },
+      },
+      get: {
+        summary: 'Consulter et réconcilier le dernier paiement de la commande',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          '200': { description: 'Statut de la tentative après interrogation de pawaPay' },
+          '404': { description: 'Commande ou tentative introuvable' },
+        },
+      },
+    },
+    '/api/webhooks/pawapay/deposits': {
+      post: {
+        summary: 'Recevoir une notification de dépôt pawaPay',
+        description: 'Le corps sert seulement à retrouver le dépôt ; le statut est revérifié auprès de pawaPay avant toute modification.',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['depositId'], properties: { depositId: { type: 'string', format: 'uuid' } },
+        } } } },
+        responses: { '200': { description: 'Notification traitée ou répétée' }, '400': { description: 'Corps invalide' } },
       },
     },
   },
