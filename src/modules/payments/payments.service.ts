@@ -16,8 +16,12 @@ export class PaymentError extends Error {
   constructor(public readonly code: PaymentErrorCode) { super(code); }
 }
 
-function publicAttempt(attempt: PaymentAttempt, alreadyProcessed: boolean) {
-  return { orderId: attempt.orderId, depositId: attempt.id, status: attempt.status, alreadyProcessed };
+function paymentStatus(attempt: PaymentAttempt) {
+  return { orderId: attempt.orderId, depositId: attempt.id, status: attempt.status };
+}
+
+function initiationResult(attempt: PaymentAttempt, alreadyProcessed: boolean) {
+  return { ...paymentStatus(attempt), alreadyProcessed };
 }
 
 async function markInitiation(attempt: PaymentAttempt, status: 'PENDING' | 'UNKNOWN' | 'FAILED') {
@@ -68,7 +72,7 @@ export async function initiatePayment(orderId: string, input: InitiatePaymentInp
     await insertAttempt(client, created);
     return { attempt: created, existing: false };
   });
-  if (existing) return publicAttempt(attempt, true);
+  if (existing) return initiationResult(attempt, true);
   let result: 'accepted' | 'rejected' | 'duplicate';
   try {
     result = await gateway.initiate({
@@ -76,10 +80,10 @@ export async function initiatePayment(orderId: string, input: InitiatePaymentInp
       amountCdf: attempt.amountCdf,
     });
   } catch {
-    return publicAttempt(await markInitiation(attempt, 'UNKNOWN'), false);
+    return initiationResult(await markInitiation(attempt, 'UNKNOWN'), false);
   }
-  if (result === 'duplicate') return publicAttempt(await refreshPayment(attempt.id, gateway), false);
-  return publicAttempt(await markInitiation(attempt, result === 'rejected' ? 'FAILED' : 'PENDING'), false);
+  if (result === 'duplicate') return initiationResult(await refreshPayment(attempt.id, gateway), false);
+  return initiationResult(await markInitiation(attempt, result === 'rejected' ? 'FAILED' : 'PENDING'), false);
 }
 
 function verifyProviderResult(attempt: PaymentAttempt, result: Exclude<DepositState, { status: 'not_found' }>) {
@@ -142,5 +146,5 @@ export async function getOrderPayment(orderId: string, gateway: PaymentGateway =
     return findLatestAttempt(client, orderId);
   });
   if (!attempt) throw new PaymentError('PAYMENT_NOT_FOUND');
-  return publicAttempt(await refreshPayment(attempt.id, gateway), true);
+  return paymentStatus(await refreshPayment(attempt.id, gateway));
 }

@@ -41,9 +41,10 @@ describe('payments HTTP contract', () => {
   });
 
   it('revérifie le paiement au GET et au callback', async () => {
-    getOrderPayment.mockResolvedValue({ orderId, depositId: orderId, status: 'COMPLETED', alreadyProcessed: true });
+    getOrderPayment.mockResolvedValue({ orderId, depositId: orderId, status: 'COMPLETED' });
     const response = await fetch(`${baseUrl}/api/orders/${orderId}/payments`);
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ orderId, depositId: orderId, status: 'COMPLETED' });
     expect(getOrderPayment).toHaveBeenCalledWith(orderId);
     refreshPayment.mockResolvedValue({ id: orderId, status: 'COMPLETED' });
     const callback = await fetch(`${baseUrl}/api/webhooks/pawapay/deposits`, {
