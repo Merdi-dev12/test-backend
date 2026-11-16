@@ -1,6 +1,6 @@
 # Ziko Boutique — API du test technique
 
-Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. Le serveur, le schéma SQL, Swagger et les routes produits sont disponibles. Les commandes, le paiement et la petite page web demandés dans le sujet seront développés ensuite.
+Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. Le serveur, le schéma SQL, Swagger et les routes produits et commandes sont disponibles. Le paiement et la petite page web demandés dans le sujet seront développés ensuite.
 
 ## État actuel
 
@@ -10,7 +10,7 @@ Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. 
 | Swagger UI `/api-docs` | Disponible ; documente actuellement `/health` |
 | Schéma PostgreSQL et migrations SQL | Disponible |
 | Création et liste des produits | Disponible : `POST /api/products`, `GET /api/products` |
-| Création et consultation des commandes | À développer |
+| Création et consultation des commandes | Disponible : `POST /api/orders`, `GET /api/orders/:id` |
 | Paiement et prévention du double paiement | À développer |
 | Petite page web | À développer |
 
@@ -105,6 +105,12 @@ Créer un produit avec `POST /api/products` et un corps JSON comme `{"name":"Sav
 
 `GET /api/products?page=1&limit=20` renvoie `{ "items": [...], "page": 1, "limit": 20, "total": 0, "totalPages": 0 }` pour un catalogue vide. La page commence à 1 ; `limit` vaut 20 par défaut et ne peut pas dépasser 100. L'ordre est `createdAt` décroissant, puis `id` décroissant pour départager les produits créés au même instant. Une pagination invalide renvoie `400` avec le code `INVALID_PAGINATION`. Les exemples interactifs sont dans Swagger.
 
+## API commandes
+
+Créer une commande avec `POST /api/orders` et `{"productId":"<uuid-du-produit>","quantity":2}`. Le produit doit exister et son stock doit couvrir la quantité demandée. La quantité doit être un entier de 1 à 1 000 000 ; cette limite garde le total calculé dans la plage sûre des entiers JavaScript. La réponse `201` contient la commande avec `status: "PENDING"`, le prix unitaire copié du produit et `totalCdf`. Le stock ne diminue pas encore : il sera revérifié au paiement. `GET /api/orders/:id` renvoie la commande et son statut.
+
+Une entrée invalide renvoie `400 INVALID_ORDER`, un identifiant de commande mal formé `400 INVALID_ORDER_ID`, un produit absent `404 PRODUCT_NOT_FOUND`, une commande absente `404 ORDER_NOT_FOUND` et un stock insuffisant `409 INSUFFICIENT_STOCK`.
+
 ## Architecture et choix techniques
 
 Le serveur est un **monolithe modulaire** : une application Express et une base PostgreSQL, avec un dossier par domaine (`products`, `orders`, `payments`). Ce découpage garde les règles proches de leur domaine sans ajouter la complexité de plusieurs services. Le parcours prévu d'une requête est `route → validation → controller → service → repository → SQL`.
@@ -155,9 +161,9 @@ Dans chaque module, `index.ts` expose sa route, `*.controller.ts` gère HTTP, `*
 
 ## Tests prévus
 
-Les tests unitaires vérifient la validation et le calcul des pages. Un test HTTP vérifie les paramètres et la réponse sans base de données. Les futurs tests d'intégration couvriront aussi le stock insuffisant, le paiement répété, les références en conflit et deux appels simultanés.
+Les tests unitaires vérifient la validation, le calcul des pages et les erreurs métier des commandes. Les tests HTTP avec PostgreSQL vérifient la création des produits et commandes, le stock insuffisant, le prix figé et la consultation. Le paiement répété, les références en conflit et deux appels simultanés seront testés avec le module paiements.
 
-Pour exécuter les tests produit sur une vraie base sous PowerShell :
+Pour exécuter les tests produits et commandes sur une vraie base sous PowerShell :
 
 ```powershell
 Copy-Item .env.example .env

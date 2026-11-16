@@ -3,7 +3,7 @@ export const openApiDocument = {
   info: {
     title: 'Ziko Boutique API',
     version: '0.1.0',
-    description: 'API de la boutique Ziko. Produits disponibles ; commandes et paiements à venir.',
+    description: 'API de la boutique Ziko. Produits et commandes disponibles ; paiement à venir.',
   },
   components: {
     schemas: {
@@ -16,6 +16,20 @@ export const openApiDocument = {
           priceCdf: { type: 'integer', minimum: 0, description: 'Prix en francs congolais' },
           stock: { type: 'integer', minimum: 0 },
           createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      Order: {
+        type: 'object',
+        required: ['id', 'productId', 'quantity', 'unitPriceCdf', 'totalCdf', 'status', 'createdAt', 'paidAt'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          productId: { type: 'string', format: 'uuid' },
+          quantity: { type: 'integer', minimum: 1 },
+          unitPriceCdf: { type: 'integer', minimum: 0 },
+          totalCdf: { type: 'integer', minimum: 0 },
+          status: { type: 'string', enum: ['PENDING', 'PAID'] },
+          createdAt: { type: 'string', format: 'date-time' },
+          paidAt: { type: 'string', format: 'date-time', nullable: true },
         },
       },
     },
@@ -62,6 +76,36 @@ export const openApiDocument = {
             },
           } } } },
           '400': { description: 'Paramètres de pagination invalides' },
+        },
+      },
+    },
+    '/api/orders': {
+      post: {
+        summary: 'Créer une commande pour un produit',
+        description: 'Vérifie le stock sans le réserver. La commande démarre en attente.',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['productId', 'quantity'], additionalProperties: false,
+          properties: {
+            productId: { type: 'string', format: 'uuid' },
+            quantity: { type: 'integer', minimum: 1, maximum: 1000000 },
+          },
+        } } } },
+        responses: {
+          '201': { description: 'Commande créée', content: { 'application/json': { schema: { $ref: '#/components/schemas/Order' } } } },
+          '400': { description: 'Données invalides' },
+          '404': { description: 'Produit introuvable' },
+          '409': { description: 'Stock insuffisant' },
+        },
+      },
+    },
+    '/api/orders/{id}': {
+      get: {
+        summary: 'Consulter une commande et son statut',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          '200': { description: 'Commande trouvée', content: { 'application/json': { schema: { $ref: '#/components/schemas/Order' } } } },
+          '400': { description: 'Identifiant invalide' },
+          '404': { description: 'Commande introuvable' },
         },
       },
     },
