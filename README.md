@@ -39,7 +39,7 @@ Pour le parcours le plus simple, suis **Lancer avec Docker**. Dans ce mode, pgAd
 Suivre ces étapes **dans cet ordre**. Garder Docker démarré pendant l'utilisation de pgAdmin.
 
 1. Démarrer **Docker Desktop**. Dans PowerShell, se placer à la racine du projet. Si `.env` n'existe pas encore, le créer avec `if (-not (Test-Path .env)) { Copy-Item .env.example .env }`. Sous Bash : `test -f .env || cp .env.example .env`.
-2. Ouvrir `.env`. Pour une première installation, choisir un `DB_PASSWORD` privé et un `ADMIN_API_KEY` d'au moins 16 caractères. Si la base Docker a déjà servi, **ne pas changer** `DB_USER`, `DB_PASSWORD` ni `DB_NAME` : le volume garde les identifiants du premier démarrage. Les variables pawaPay sont facultatives pour vérifier le lancement.
+2. Ouvrir `.env`. Pour une première installation, choisir un `DB_PASSWORD` privé. Si la base Docker a déjà servi, **ne pas changer** `DB_USER`, `DB_PASSWORD` ni `DB_NAME` : le volume garde les identifiants du premier démarrage. Les variables pawaPay sont facultatives pour vérifier le lancement.
 3. Dans le même terminal, lancer :
 
    ```powershell
@@ -141,7 +141,7 @@ Ce mode utilise une installation PostgreSQL Windows distincte de la base Docker.
 
    Cliquer sur **Save**, puis déplier **Servers → Ziko local → Databases**. La base `ziko` doit apparaître. Le mot de passe du compte `postgres` sert uniquement à la connexion d'administration de l'étape 3 ; `DB_PASSWORD` est celui du compte `ziko` utilisé par l'application.
 
-7. Pour activer pawaPay, ajouter dans `.env` `PAWAPAY_BASE_URL` avec l'URL officielle de la sandbox et `PAWAPAY_API_TOKEN` avec le jeton du tableau de bord sandbox. Sans ces deux valeurs, l'API démarre, mais l'initiation répond `503 PROVIDER_NOT_CONFIGURED`. Définir également `ADMIN_API_KEY` avec une valeur aléatoire d'au moins 16 caractères si l'API est exposée ; elle sera obligatoire avec `NODE_ENV=production`. Le jeton reste dans `.env`, jamais dans Git ni dans le frontend.
+7. Pour activer pawaPay, ajouter dans `.env` `PAWAPAY_BASE_URL` avec l'URL officielle de la sandbox et `PAWAPAY_API_TOKEN` avec le jeton du tableau de bord sandbox. Sans ces deux valeurs, l'API démarre, mais l'initiation répond `503 PROVIDER_NOT_CONFIGURED`. Le jeton reste dans `.env`, jamais dans Git ni dans le frontend.
 
 8. Toujours dans PowerShell, appliquer les migrations, puis démarrer l'API. Laisser le terminal ouvert :
 
@@ -194,7 +194,7 @@ npm start
 
 ## API produits
 
-Créer un produit avec `POST /api/products` et un corps JSON comme `{"name":"Savon","priceCdf":5000,"stock":10}`. Ce sont les trois attributs demandés par le sujet : nom, prix entier en francs congolais et stock physique. L'API ajoute `id` et `createdAt` à la réponse. Le nom ne peut pas être vide ; le prix et le stock sont des entiers non négatifs. Une entrée invalide renvoie `400 INVALID_PRODUCT`. Si `ADMIN_API_KEY` est définie, l'en-tête `x-admin-key` est requis pour cette route ; il est toujours requis en production.
+Créer un produit avec `POST /api/products` et un corps JSON comme `{"name":"Savon","priceCdf":5000,"stock":10}`. Ce sont les trois attributs demandés par le sujet : nom, prix entier en francs congolais et stock physique. L'API ajoute `id` et `createdAt` à la réponse. Le nom ne peut pas être vide ; le prix et le stock sont des entiers non négatifs. Une entrée invalide renvoie `400 INVALID_PRODUCT`. La création est ouverte pour permettre le parcours de démonstration sans compte utilisateur ni clé à saisir.
 
 `GET /api/products?page=1&limit=20` renvoie `{ "items": [...], "page": 1, "limit": 20, "total": 0, "totalPages": 0 }` pour un catalogue vide. La page commence à 1 ; `limit` vaut 20 par défaut et ne peut pas dépasser 100. L'ordre est `createdAt` décroissant, puis `id` décroissant pour départager les produits créés au même instant. Une pagination invalide renvoie `400` avec le code `INVALID_PAGINATION`. Les exemples interactifs sont dans Swagger.
 
@@ -234,7 +234,7 @@ Redis n'est pas nécessaire à cette initialisation : PostgreSQL peut assurer l'
 
 La [documentation officielle pawaPay](https://docs.pawapay.io/v2/docs/providers) confirme les collectes en CDF via Vodacom M-Pesa, Airtel et Orange en RDC. La sandbox est isolée de la production. L'adaptateur HTTP reste dans le module `payments` ; le service métier dépend d'un contrat de passerelle simulable dans les tests. Le worker interroge les tentatives non résolues toutes les 30 secondes lorsque les identifiants sandbox sont configurés. Aucun jeton live et aucun paiement réel ne sont utilisés.
 
-Les routes publiques sont limitées en fréquence, les entrées sont validées, les en-têtes de sécurité sont ajoutés par Helmet et CORS n'autorise que `CORS_ORIGIN` si elle est définie. La création de produits exige `x-admin-key` lorsque `ADMIN_API_KEY` est configurée et toujours en production. Les commandes restent accessibles par identifiant UUID pour permettre le parcours invité du test ; une authentification des clients et une protection contre l'énumération seraient nécessaires pour une boutique publique.
+Les routes publiques sont limitées en fréquence, les entrées sont validées, les en-têtes de sécurité sont ajoutés par Helmet et CORS n'autorise que `CORS_ORIGIN` si elle est définie. La création de produits est volontairement publique pour ce test. Les commandes restent accessibles par identifiant UUID pour permettre le parcours invité ; une authentification et des autorisations seraient nécessaires avant d'exposer durablement cette API comme une boutique publique.
 
 ## Arborescence
 
@@ -253,7 +253,6 @@ Les routes publiques sont limitées en fréquence, les entrées sont validées, 
 │   │   ├── pool.ts               Pool PostgreSQL
 │   │   ├── migrations/           Évolutions SQL du schéma
 │   │   └── seeders/              Données de démonstration facultatives
-│   ├── shared/                   Contrôle administrateur
 │   └── modules/
 │       ├── products/             Produit et stock
 │       ├── orders/               Création et consultation des commandes
@@ -273,7 +272,7 @@ Les trois modules suivent le même trajet : `index.ts` branche les routes, le co
 
 | Fichier | Responsabilité |
 | --- | --- |
-| `src/modules/products/index.ts` | Déclare les routes produits ; protège la création avec `requireAdmin`. |
+| `src/modules/products/index.ts` | Déclare les routes de création et de liste des produits. |
 | `src/modules/products/products.controller.ts` | Lit le corps et la pagination, renvoie les réponses et erreurs HTTP. |
 | `src/modules/products/products.schema.ts` | Valide le nom, le prix CDF, le stock et les paramètres de liste. |
 | `src/modules/products/products.service.ts` | Crée l'identifiant du produit et compose la réponse paginée. |
@@ -292,7 +291,7 @@ Les trois modules suivent le même trajet : `index.ts` branche les routes, le co
 | `src/modules/payments/pawapay.gateway.ts` | Appelle l'API sandbox pawaPay et transforme ses réponses en états internes. |
 | `src/modules/*/AGENTS.md` | Précise les règles propres au domaine pour les assistants IA. |
 
-Hors des modules, `src/app.ts` configure Express, les middlewares et les routes ; `src/server.ts` gère le cycle de vie ; `src/openapi.ts` décrit l'API Swagger. `src/config/` valide et centralise la configuration, `src/database/pool.ts` ouvre les connexions, et `src/shared/admin-access.ts` contrôle la création des produits. `scripts/migrate.ts` applique les migrations, `scripts/seed.ts` est un point d'entrée encore vide pour les données de démonstration et `scripts/reconcile-payments.ts` relance la consultation des tentatives incertaines. `tests/unit/` isole les règles et `tests/integration/` vérifie HTTP, SQL et concurrence.
+Hors des modules, `src/app.ts` configure Express, les middlewares et les routes ; `src/server.ts` gère le cycle de vie ; `src/openapi.ts` décrit l'API Swagger. `src/config/` valide et centralise la configuration, et `src/database/pool.ts` ouvre les connexions. `scripts/migrate.ts` applique les migrations, `scripts/seed.ts` est un point d'entrée encore vide pour les données de démonstration et `scripts/reconcile-payments.ts` relance la consultation des tentatives incertaines. `tests/unit/` isole les règles et `tests/integration/` vérifie HTTP, SQL et concurrence.
 
 ## Tests
 
@@ -302,7 +301,7 @@ Pour exécuter tous les tests sur une vraie base sous PowerShell :
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-# Vérifier DB_PASSWORD et ADMIN_API_KEY dans .env avant de lancer Compose.
+# Vérifier DB_PASSWORD dans .env avant de lancer Compose.
 docker compose up --build -d
 $env:RUN_DB_TESTS='true'
 npm test

@@ -10,7 +10,6 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('orders HTTP + PostgreSQL',
   let pool: typeof import('../../src/database/pool.js').pool;
   const productIds: string[] = [];
   const orderIds: string[] = [];
-  const adminHeaders = process.env.ADMIN_API_KEY ? { 'x-admin-key': process.env.ADMIN_API_KEY } : {};
 
   beforeAll(async () => {
     const required = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'] as const;
@@ -33,7 +32,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('orders HTTP + PostgreSQL',
 
   async function createProduct(stock: number, priceCdf = 5000) {
     const response = await fetch(`${baseUrl}/api/products`, {
-      method: 'POST', headers: { 'content-type': 'application/json', ...adminHeaders },
+      method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: `Produit ${randomUUID()}`, priceCdf, stock }),
     });
     expect(response.status).toBe(201);

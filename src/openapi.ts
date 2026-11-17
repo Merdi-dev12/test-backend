@@ -44,8 +44,6 @@ export const openApiDocument = {
     '/api/products': {
       post: {
         summary: 'Créer un produit',
-        parameters: [{ name: 'x-admin-key', in: 'header', required: false,
-          description: 'Requis si ADMIN_API_KEY est configurée, toujours requis en production.', schema: { type: 'string' } }],
         requestBody: {
           required: true,
           content: { 'application/json': { schema: {
