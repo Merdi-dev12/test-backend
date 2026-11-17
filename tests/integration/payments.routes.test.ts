@@ -38,6 +38,12 @@ describe('payments HTTP contract', () => {
       body: JSON.stringify({ paymentReference: 'invented' }),
     });
     expect(invalid.status).toBe(400);
+    const wrongProvider = await fetch(`${baseUrl}/api/orders/${orderId}/payments`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'ORANGE_COD', phoneNumber: '243813456789' }),
+    });
+    expect(wrongProvider.status).toBe(400);
+    expect(initiatePayment).toHaveBeenCalledTimes(1);
   });
 
   it('revérifie le paiement au GET et au callback', async () => {
