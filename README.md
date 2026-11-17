@@ -12,7 +12,7 @@ Backend d'une petite boutique de Kinshasa en TypeScript, Express et PostgreSQL. 
 | Création et liste des produits | Disponible : `POST /api/products`, `GET /api/products` |
 | Création et consultation des commandes | Disponible : `POST /api/orders`, `GET /api/orders/:id` |
 | Paiement sandbox et prévention du double paiement | Disponible : initiation, consultation, callback et réconciliation |
-| Frontend Angular | Projet séparé, à développer |
+| Frontend Angular | Projet séparé ; catalogue, commande et paiement sandbox disponibles |
 
 ## Prérequis
 
@@ -207,6 +207,8 @@ Une entrée invalide renvoie `400 INVALID_ORDER`, un identifiant de commande mal
 ## API paiements
 
 `POST /api/orders/:id/payments` reçoit `{"provider":"VODACOM_MPESA_COD","phoneNumber":"243813456789"}`. Le serveur vérifie la commande, réserve le stock et enregistre un `depositId` unique avant d'appeler la sandbox pawaPay. La réponse `202` contient `orderId`, `depositId`, `status` (`PENDING`, `UNKNOWN` ou `FAILED`) et `alreadyProcessed`. Une répétition de la même initiation récupère la tentative existante ; un autre numéro ou opérateur pendant cette tentative renvoie `409 PAYMENT_IN_PROGRESS`. Le client ne fournit ni montant ni référence arbitraire.
+
+Le numéro envoyé à l'API commence par `243` et contient 12 chiffres. L'API vérifie aussi sa cohérence avec l'opérateur choisi : Vodacom `081/082/083/086`, Airtel `097/098/099`, Orange `080/084/085/089`. Cette vérification des préfixes sert au parcours de démonstration ; un numéro porté vers un autre opérateur doit être vérifié auprès du fournisseur avant de lui appliquer cette règle en production.
 
 Le sujet décrit une API recevant un identifiant de paiement simulé. Ici, le backend crée cet identifiant (`depositId`) et le transmet à la sandbox : le client réutilise la même commande lors d'un nouvel appel. Cette variante permet de vérifier le résultat auprès de pawaPay avant de déclarer la commande payée. Une commande déjà `PAID` renvoie `409 ORDER_ALREADY_PAID` sans nouvel appel fournisseur.
 

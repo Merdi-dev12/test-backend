@@ -119,7 +119,8 @@ export const openApiDocument = {
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object', required: ['provider', 'phoneNumber'], additionalProperties: false,
           properties: { provider: { type: 'string', enum: ['VODACOM_MPESA_COD', 'AIRTEL_COD', 'ORANGE_COD'] },
-            phoneNumber: { type: 'string', pattern: '^243[0-9]{9}$' } },
+            phoneNumber: { type: 'string', pattern: '^243[0-9]{9}$',
+              description: 'Numéro RDC au format 243 suivi de 9 chiffres. Préfixes : Vodacom 81/82/83/86 ; Airtel 97/98/99 ; Orange 80/84/85/89. Le préfixe doit correspondre au fournisseur choisi.' } },
         } } } },
         responses: {
           '202': { description: 'Tentative créée ou déjà en cours', content: { 'application/json': { schema: {
